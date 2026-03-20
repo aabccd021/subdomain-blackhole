@@ -5,11 +5,11 @@ server.wait_for_open_port(443)
 attacker.wait_for_unit("multi-user.target")
 
 # Request to the legitimate virtualHost should work
-result = attacker.succeed("curl -sk https://server.com/")
-assert "Hello from server.com" in result, f"Expected greeting, got: {result}"
+result = attacker.succeed("curl -s --cacert /etc/ssl/server.pem https://example.com/")
+assert "Hello from example.com" in result, f"Expected greeting, got: {result}"
 
 # Make a request with unmatched SNI (should fail - connection rejected)
-attacker.fail("curl -sk https://unknown.server.com/")
+attacker.fail("curl -s --cacert /etc/ssl/server.pem https://unknown.example.com/")
 
 # Wait for fail2ban to ban the IP and verify exact output
 server.wait_until_succeeds("fail2ban-client status subdomain-blackhole | grep -q '192.168.1.1'", timeout=10)

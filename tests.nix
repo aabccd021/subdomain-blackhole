@@ -17,17 +17,18 @@
             { address = serverIp; prefixLength = 24; }
           ];
           services.nginx.enable = true;
-          services.nginx.virtualHosts."server.com" = {
+          services.nginx.virtualHosts."example.com" = {
             onlySSL = true;
             sslCertificate = ./test/cert.pem;
             sslCertificateKey = ./test/key.pem;
-            locations."/".return = "200 'Hello from server.com'";
+            locations."/".return = "200 'Hello from example.com'";
           };
           services.subdomain-blackhole.enable = true;
           networking.firewall.allowedTCPPorts = [ 443 ];
         };
       nodes.attacker = {
-        networking.hosts.${serverIp} = [ "server.com" "unknown.server.com" ];
+        networking.hosts.${serverIp} = [ "example.com" "unknown.example.com" ];
+        environment.etc."ssl/server.pem".source = ./test/cert.pem;
       };
       testScript = builtins.readFile ./test/nginx.py;
     };
