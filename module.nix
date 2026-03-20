@@ -14,6 +14,9 @@ let
       null;
   filterName = "subdomain-blackhole";
 
+  # Hardcoded in NixOS nginx module (services.nginx.stateDir was removed)
+  nginxLogPath = "/var/log/nginx/subdomain-blackhole.log";
+
   # Check for nginx virtualHosts with default = true (excluding our catch-all "_")
   defaultNginxHosts = lib.filterAttrs (name: vhost: name != "_" && (vhost.default or false)) (
     config.services.nginx.virtualHosts or { }
@@ -76,7 +79,7 @@ in
             enabled = true;
             filter = filterName;
             backend = "auto";
-            logpath = "/var/log/nginx/subdomain-blackhole.log";
+            logpath = nginxLogPath;
             maxretry = lib.mkDefault 1;
           }
         else if webserver == "caddy" then
@@ -99,7 +102,7 @@ in
       default = true;
       rejectSSL = true;
       extraConfig = ''
-        error_log /var/log/nginx/subdomain-blackhole.log info;
+        error_log ${nginxLogPath} info;
       '';
     };
 
