@@ -17,6 +17,9 @@ let
   # Hardcoded in NixOS nginx module (services.nginx.stateDir was removed)
   nginxLogPath = "/var/log/nginx/subdomain-blackhole.log";
 
+  # Caddy log path for TLS handshake errors (uses services.caddy.logDir)
+  caddyLogPath = "${config.services.caddy.logDir}/subdomain-blackhole.log";
+
   # Check for nginx virtualHosts with default = true (excluding our catch-all "_")
   defaultNginxHosts = lib.filterAttrs (name: vhost: name != "_" && (vhost.default or false)) (
     config.services.nginx.virtualHosts or { }
@@ -65,7 +68,6 @@ in
           failregex = ^.*TLS handshake error from <HOST>:\d+:.*$
           ignoreregex =
           datepattern = "ts":{EPOCH}
-          journalmatch = _SYSTEMD_UNIT=caddy.service
         ''
       else
         throw "subdomain-blackhole: unsupported webserver";
@@ -86,7 +88,8 @@ in
           {
             enabled = true;
             filter = filterName;
-            backend = "systemd";
+            backend = "auto";
+            logpath = caddyLogPath;
             maxretry = lib.mkDefault 1;
           }
         else
@@ -106,8 +109,18 @@ in
       '';
     };
 
-    # Caddy log level to capture TLS handshake errors
-    services.caddy.logFormat = lib.mkIf (webserver == "caddy") "level DEBUG";
+    # Ensure caddy log file exists before fail2ban starts
+    systemd.tmpfiles.rules = lib.mkIf (webserver == "caddy") [
+      "d ${builtins.dirOf caddyLogPath} 0755 caddy caddy -"
+      "f ${caddyLogPath} 0644 caddy caddy -"
+    ];
+
+    # Caddy log format - write to file with minimum level needed for TLS errors
+    # TLS handshake errors are logged at DEBUG level in Caddy
+    services.caddy.logFormat = lib.mkIf (webserver == "caddy") ''
+      output file ${caddyLogPath}
+      level DEBUG
+    '';
 
   };
 }
