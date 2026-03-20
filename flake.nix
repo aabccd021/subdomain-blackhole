@@ -39,19 +39,12 @@
         programs.nixfmt.enable = true;
       };
 
+      tests = import ./tests.nix { inherit pkgs self; };
+
       packages = {
         formatting = treefmtEval.config.build.check self;
-        test = pkgs.testers.runNixOSTest {
-          name = "subdomain-blackhole";
-          nodes.machine = {
-            imports = [ self.nixosModules.default ];
-            services.subdomain-blackhole.enable = true;
-          };
-          testScript = ''
-            machine.wait_for_unit("multi-user.target")
-            machine.succeed("cat /etc/hello | grep 'Hello, World!'")
-          '';
-        };
+        test-nginx = tests.nginx;
+        test-caddy = tests.caddy;
       };
 
     in

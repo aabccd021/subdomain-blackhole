@@ -1,0 +1,15 @@
+server.wait_for_unit("nginx.service")
+server.wait_for_unit("fail2ban.service")
+server.wait_for_open_port(443)
+
+attacker.wait_for_unit("multi-user.target")
+
+# Request to the legitimate virtualHost should work
+result = attacker.succeed("curl -sk --resolve example.com:443:$(getent hosts server | awk '{print $1}') https://example.com/")
+assert "Hello from example.com" in result, f"Expected greeting, got: {result}"
+
+# Make a request with unmatched SNI
+attacker.succeed("curl -sk --resolve unknown.example.com:443:$(getent hosts server | awk '{print $1}') https://unknown.example.com/ || true")
+
+# Wait for fail2ban to ban the IP
+server.wait_until_succeeds("fail2ban-client status subdomain-blackhole | grep -q '2001:db8:1::1'", timeout=30)
