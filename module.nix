@@ -39,14 +39,6 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.services.nginx.enable || config.services.caddy.enable;
-        message = "subdomain-blackhole: either nginx or caddy must be enabled";
-      }
-      {
-        assertion = !(config.services.nginx.enable && config.services.caddy.enable);
-        message = "subdomain-blackhole: cannot have both nginx and caddy enabled";
-      }
-      {
         assertion = !config.services.nginx.enable || defaultNginxHosts == { };
         message = "subdomain-blackhole: cannot have nginx virtualHosts with 'default = true'. Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames defaultNginxHosts)}";
       }
@@ -63,12 +55,14 @@ in
           [Definition]
           failregex = ^.*handshake rejected.*client: <HOST>,.*$
         ''
-      else
+      else if config.services.caddy.enable then
         ''
           [Definition]
           failregex = ^.*TLS handshake error from <HOST>:\d+:.*$
           datepattern = "ts":{EPOCH}
-        '';
+        ''
+      else
+        throw "subdomain-blackhole: either nginx or caddy must be enabled";
 
     # Fail2ban jail
     services.fail2ban = {
@@ -77,7 +71,13 @@ in
         enabled = true;
         filter = filterName;
         backend = "auto";
-        logpath = if config.services.nginx.enable then nginxLogPath else caddyLogPath;
+        logpath =
+          if config.services.nginx.enable then
+            nginxLogPath
+          else if config.services.caddy.enable then
+            caddyLogPath
+          else
+            throw "subdomain-blackhole: either nginx or caddy must be enabled";
         maxretry = lib.mkDefault 1;
       };
     };
