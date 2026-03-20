@@ -11,5 +11,16 @@ assert "Hello from example.com" in result, f"Expected greeting, got: {result}"
 # Make a request with unmatched SNI
 attacker.succeed("curl -sk --resolve unknown.example.com:443:$(getent hosts server | awk '{print $1}') https://unknown.example.com/ || true")
 
-# Wait for fail2ban to ban the IP
+# Wait for fail2ban to ban the IP and verify exact output
 server.wait_until_succeeds("fail2ban-client status subdomain-blackhole | grep -q '2001:db8:1::1'", timeout=30)
+output = server.succeed("fail2ban-client status subdomain-blackhole")
+expected = """Status for the jail: subdomain-blackhole
+|- Filter
+|  |- Currently failed:\t0
+|  |- Total failed:\t1
+|  `- Journal matches:\t_SYSTEMD_UNIT=nginx.service
+`- Actions
+   |- Currently banned:\t1
+   |- Total banned:\t1
+   `- Banned IP list:\t2001:db8:1::1"""
+assert output.strip() == expected, f"Expected:\n{expected}\n\nGot:\n{output}"
