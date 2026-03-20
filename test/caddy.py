@@ -4,31 +4,23 @@ server.wait_for_open_port(443)
 
 attacker.wait_for_unit("multi-user.target")
 
-# Request to the legitimate virtualHost should work (use SNI for example.com)
-result = attacker.succeed("curl -sk --resolve example.com:443:$(getent hosts server | awk '{print $1}') https://example.com/")
+# Request to the legitimate virtualHost should work
+result = attacker.succeed("curl -s --cacert /etc/ssl/server.pem https://example.com/")
 assert "Hello from example.com" in result, f"Expected greeting, got: {result}"
 
-# Make a request with unmatched SNI - should hit catch-all
-print("=== curl unmatched SNI ===")
-result = attacker.succeed("curl -svk --resolve unknown.example.com:443:$(getent hosts server | awk '{print $1}') https://unknown.example.com/ 2>&1 || true")
-print(result)
+# Make a request with unmatched SNI (TLS fails, but IP gets logged)
+attacker.fail("curl -sk https://unknown.example.com/")
 
-# Wait for fail2ban to process the log
-server.sleep(2)
-
-# Debug: show caddy logs
-print("=== caddy log file ===")
-print(server.succeed("cat /var/log/caddy/subdomain-blackhole.log || echo 'file empty or missing'"))
-print("=== journalctl caddy ===")
-print(server.succeed("journalctl -u caddy --no-pager"))
-print("=== caddy config ===")
-print(server.succeed("find /nix/store -name 'Caddyfile' -exec cat {} \\; 2>/dev/null | head -50 || echo 'not found'"))
-print("=== caddy systemd ===")
-print(server.succeed("systemctl cat caddy | head -30"))
-
-# Check log was written
-server.succeed("test -s /var/log/caddy/subdomain-blackhole.log")
-
-# Verify fail2ban banned an IP
+# Wait for fail2ban to ban the IP and verify exact output
+server.wait_until_succeeds("fail2ban-client status subdomain-blackhole | grep -q '192.168.1.1'", timeout=10)
 output = server.succeed("fail2ban-client status subdomain-blackhole")
-assert "Banned IP list:" in output and output.split("Banned IP list:")[1].strip(), f"No IP was banned: {output}"
+expected = """Status for the jail: subdomain-blackhole
+|- Filter
+|  |- Currently failed:\t0
+|  |- Total failed:\t1
+|  `- Journal matches:\t_SYSTEMD_UNIT=caddy.service
+`- Actions
+   |- Currently banned:\t1
+   |- Total banned:\t1
+   `- Banned IP list:\t192.168.1.1"""
+assert output.strip() == expected, f"Expected:\n{expected}\n\nGot:\n{output}"

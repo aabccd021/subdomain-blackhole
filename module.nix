@@ -13,6 +13,11 @@ let
   otherDefaultNginxHosts = lib.filterAttrs (name: vhost: name != "_" && (vhost.default or false)) (
     config.services.nginx.virtualHosts or { }
   );
+
+  # Check for Caddy catch-all virtualHosts (ports without domains)
+  caddyCatchAllHosts = lib.filterAttrs (name: _: builtins.match "^:[0-9]+$" name != null) (
+    config.services.caddy.virtualHosts or { }
+  );
 in
 {
   options.services.subdomain-blackhole = {
@@ -32,6 +37,10 @@ in
         assertion = !nginxEnabled || otherDefaultNginxHosts == { };
         message = "subdomain-blackhole: cannot have other nginx virtualHosts with 'default = true'. Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames otherDefaultNginxHosts)}";
       }
+      {
+        assertion = !caddyEnabled || caddyCatchAllHosts == { };
+        message = "subdomain-blackhole: cannot have Caddy catch-all virtualHosts (like ':443'). Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames caddyCatchAllHosts)}";
+      }
     ];
 
     # Fail2ban filter
@@ -46,32 +55,28 @@ in
       else
         ''
           [Definition]
-          failregex = ^.*"client_ip":"<HOST>".*$
+          failregex = ^.*TLS handshake error from <HOST>:\d+:.*$
           ignoreregex =
           datepattern = "ts":{EPOCH}
+          journalmatch = _SYSTEMD_UNIT=caddy.service
         '';
 
     # Fail2ban jail
     services.fail2ban = {
       enable = true;
       jails.${cfg.jailName}.settings = {
-        enabled = lib.mkDefault true;
-        filter = lib.mkDefault "subdomain-blackhole";
-        backend = lib.mkDefault (if webserver == "nginx" then "systemd" else "polling");
-        bantime = lib.mkDefault 3600;
+        enabled = true;
+        filter = "subdomain-blackhole";
+        backend = "systemd";
         maxretry = lib.mkDefault 1;
-        findtime = lib.mkDefault 600;
-        logpath = lib.mkDefault (
-          if webserver == "nginx" then
-            "" # journald doesn't need logpath
-          else
-            "/var/log/caddy/subdomain-blackhole.log"
-        );
       };
     };
 
     # Nginx log level to capture ssl_reject_handshake
     services.nginx.logError = lib.mkIf nginxEnabled "stderr info";
+
+    # Caddy log level to capture TLS handshake errors
+    services.caddy.logFormat = lib.mkIf caddyEnabled "level DEBUG";
 
     # Nginx configuration - reject SSL for unmatched SNI
     services.nginx.virtualHosts."_" = lib.mkIf nginxEnabled {
@@ -91,24 +96,5 @@ in
       ];
     };
 
-    # Caddy configuration - HTTPS catch-all
-    services.caddy.virtualHosts.":443" = lib.mkIf caddyEnabled {
-      logFormat = ''
-        output file /var/log/caddy/subdomain-blackhole.log
-        format json
-      '';
-      extraConfig = ''
-        tls internal
-        respond 444 {
-          close
-        }
-      '';
-    };
-
-    # Ensure log directory and file exist for caddy
-    systemd.tmpfiles.rules = lib.mkIf caddyEnabled [
-      "d /var/log/caddy 0755 caddy caddy -"
-      "f /var/log/caddy/subdomain-blackhole.log 0644 caddy caddy -"
-    ];
   };
 }
