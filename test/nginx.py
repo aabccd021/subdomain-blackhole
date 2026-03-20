@@ -8,8 +8,8 @@ attacker.wait_for_unit("multi-user.target")
 result = attacker.succeed("curl -sk https://server.com/")
 assert "Hello from server.com" in result, f"Expected greeting, got: {result}"
 
-# Make a request with unmatched SNI
-attacker.succeed("curl -sk https://unknown.server.com/ || true")
+# Make a request with unmatched SNI (should fail - connection rejected)
+attacker.fail("curl -sk https://unknown.server.com/")
 
 # Wait for fail2ban to ban the IP and verify exact output
 server.wait_until_succeeds("fail2ban-client status subdomain-blackhole | grep -q '192.168.1.1'", timeout=10)
