@@ -5,9 +5,13 @@
 }:
 let
   cfg = config.services.subdomain-blackhole;
-  nginxEnabled = config.services.nginx.enable;
-  caddyEnabled = config.services.caddy.enable;
-  webserver = if nginxEnabled then "nginx" else "caddy";
+  webserver =
+    if config.services.nginx.enable then
+      "nginx"
+    else if config.services.caddy.enable then
+      "caddy"
+    else
+      null;
   filterName = "subdomain-blackhole";
 
   # Check for other nginx virtualHosts with default = true (excluding our own "_")
@@ -35,11 +39,15 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = !nginxEnabled || otherDefaultNginxHosts == { };
+        assertion = webserver != null;
+        message = "subdomain-blackhole: requires either nginx or caddy to be enabled";
+      }
+      {
+        assertion = webserver != "nginx" || otherDefaultNginxHosts == { };
         message = "subdomain-blackhole: cannot have other nginx virtualHosts with 'default = true'. Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames otherDefaultNginxHosts)}";
       }
       {
-        assertion = !caddyEnabled || caddyCatchAllHosts == { };
+        assertion = webserver != "caddy" || caddyCatchAllHosts == { };
         message = "subdomain-blackhole: cannot have Caddy catch-all virtualHosts (like ':443'). Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames caddyCatchAllHosts)}";
       }
     ];
@@ -53,14 +61,16 @@ in
           ignoreregex =
           journalmatch = _SYSTEMD_UNIT=nginx.service
         ''
-      else
+      else if webserver == "caddy" then
         ''
           [Definition]
           failregex = ^.*TLS handshake error from <HOST>:\d+:.*$
           ignoreregex =
           datepattern = "ts":{EPOCH}
           journalmatch = _SYSTEMD_UNIT=caddy.service
-        '';
+        ''
+      else
+        throw "subdomain-blackhole: unsupported webserver";
 
     # Fail2ban jail
     services.fail2ban = {
@@ -74,13 +84,13 @@ in
     };
 
     # Nginx log level to capture ssl_reject_handshake
-    services.nginx.logError = lib.mkIf nginxEnabled "stderr info";
+    services.nginx.logError = lib.mkIf (webserver == "nginx") "stderr info";
 
     # Caddy log level to capture TLS handshake errors
-    services.caddy.logFormat = lib.mkIf caddyEnabled "level DEBUG";
+    services.caddy.logFormat = lib.mkIf (webserver == "caddy") "level DEBUG";
 
     # Nginx configuration - reject SSL for unmatched SNI
-    services.nginx.virtualHosts."_" = lib.mkIf nginxEnabled {
+    services.nginx.virtualHosts."_" = lib.mkIf (webserver == "nginx") {
       default = true;
       rejectSSL = true;
       listen = [
