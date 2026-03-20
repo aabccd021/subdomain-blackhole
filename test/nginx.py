@@ -8,8 +8,8 @@ attacker.wait_for_unit("multi-user.target")
 result = attacker.succeed("curl -s --cacert /etc/ssl/server.pem https://example.com/")
 assert "Hello from example.com" in result, f"Expected greeting, got: {result}"
 
-# Make a request with unmatched SNI (should fail - connection rejected)
-attacker.fail("curl -s --cacert /etc/ssl/server.pem https://unknown.example.com/")
+# Make a request with unmatched SNI (TLS fails, but IP gets logged)
+attacker.fail("curl -sk https://unknown.example.com/")
 
 # Wait for fail2ban to ban the IP and verify exact output
 server.wait_until_succeeds("fail2ban-client status subdomain-blackhole | grep -q '192.168.1.1'", timeout=10)

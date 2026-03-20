@@ -14,8 +14,8 @@ let
       null;
   filterName = "subdomain-blackhole";
 
-  # Check for other nginx virtualHosts with default = true (excluding our own "_")
-  otherDefaultNginxHosts = lib.filterAttrs (name: vhost: name != "_" && (vhost.default or false)) (
+  # Check for nginx virtualHosts with default = true (excluding our catch-all "_")
+  defaultNginxHosts = lib.filterAttrs (name: vhost: name != "_" && (vhost.default or false)) (
     config.services.nginx.virtualHosts or { }
   );
 
@@ -39,8 +39,8 @@ in
   config = lib.mkIf (cfg.enable && webserver != null) {
     assertions = [
       {
-        assertion = webserver != "nginx" || otherDefaultNginxHosts == { };
-        message = "subdomain-blackhole: cannot have other nginx virtualHosts with 'default = true'. Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames otherDefaultNginxHosts)}";
+        assertion = webserver != "nginx" || defaultNginxHosts == { };
+        message = "subdomain-blackhole: cannot have nginx virtualHosts with 'default = true'. Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames defaultNginxHosts)}";
       }
       {
         assertion = webserver != "caddy" || caddyCatchAllHosts == { };
@@ -82,25 +82,18 @@ in
     # Nginx log level to capture ssl_reject_handshake
     services.nginx.logError = lib.mkIf (webserver == "nginx") "stderr info";
 
-    # Caddy log level to capture TLS handshake errors
-    services.caddy.logFormat = lib.mkIf (webserver == "caddy") "level DEBUG";
-
-    # Nginx configuration - reject SSL for unmatched SNI
+    # Nginx catch-all to reject unmatched SNI.
+    # Without this, nginx uses the first matching certificate for unknown domains.
+    # Example: if only "example.com" is configured, a request to "unknown.example.com"
+    # would be served using example.com's certificate instead of being rejected.
+    # rejectSSL uses ssl_reject_handshake to close the connection and log the attempt.
     services.nginx.virtualHosts."_" = lib.mkIf (webserver == "nginx") {
       default = true;
       rejectSSL = true;
-      listen = [
-        {
-          addr = "0.0.0.0";
-          port = 443;
-          ssl = true;
-        }
-        {
-          addr = "[::]";
-          port = 443;
-          ssl = true;
-        }
-      ];
     };
+
+    # Caddy log level to capture TLS handshake errors
+    services.caddy.logFormat = lib.mkIf (webserver == "caddy") "level DEBUG";
+
   };
 }
