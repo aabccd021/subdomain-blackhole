@@ -10,16 +10,18 @@
       {
         imports = [ self.nixosModules.default ];
         services.nginx.enable = true;
-        services.nginx.virtualHosts."example.com" = {
+        services.nginx.virtualHosts."server.com" = {
           onlySSL = true;
           sslCertificate = ./test/cert.pem;
           sslCertificateKey = ./test/key.pem;
-          locations."/".return = "200 'Hello from example.com'";
+          locations."/".return = "200 'Hello from server.com'";
         };
         services.subdomain-blackhole.enable = true;
         networking.firewall.allowedTCPPorts = [ 443 ];
       };
-    nodes.attacker = { };
+    nodes.attacker = {
+      networking.hosts."192.168.1.2" = [ "server.com" "unknown.server.com" ];
+    };
     testScript = builtins.readFile ./test/nginx.py;
   };
 
