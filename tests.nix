@@ -2,19 +2,40 @@
   pkgs,
   self,
 }:
+let
+  attacker = {
+    networking.interfaces.eth1.ipv4.addresses = [
+      {
+        address = "192.168.1.1";
+        prefixLength = 24;
+      }
+    ];
+    networking.hosts."192.168.1.2" = [
+      "example.com"
+      "unknown.example.com"
+    ];
+    environment.etc."ssl/server.pem".source = ./test/cert.pem;
+  };
+
+  serverBase = {
+    imports = [ self.nixosModules.default ];
+    networking.interfaces.eth1.ipv4.addresses = [
+      {
+        address = "192.168.1.2";
+        prefixLength = 24;
+      }
+    ];
+    services.subdomain-blackhole.enable = true;
+    networking.firewall.allowedTCPPorts = [ 443 ];
+  };
+in
 {
   nginx = pkgs.testers.runNixOSTest {
     name = "subdomain-blackhole-nginx";
     nodes.server =
       { ... }:
       {
-        imports = [ self.nixosModules.default ];
-        networking.interfaces.eth1.ipv4.addresses = [
-          {
-            address = "192.168.1.2";
-            prefixLength = 24;
-          }
-        ];
+        imports = [ serverBase ];
         services.nginx.enable = true;
         services.nginx.virtualHosts."example.com" = {
           onlySSL = true;
@@ -22,16 +43,8 @@
           sslCertificateKey = ./test/key.pem;
           locations."/".return = "200 'Hello from example.com'";
         };
-        services.subdomain-blackhole.enable = true;
-        networking.firewall.allowedTCPPorts = [ 443 ];
       };
-    nodes.attacker = {
-      networking.hosts."192.168.1.2" = [
-        "example.com"
-        "unknown.example.com"
-      ];
-      environment.etc."ssl/server.pem".source = ./test/cert.pem;
-    };
+    nodes.attacker = attacker;
     testScript = builtins.readFile ./test/nginx.py;
   };
 
@@ -40,13 +53,7 @@
     nodes.server =
       { ... }:
       {
-        imports = [ self.nixosModules.default ];
-        networking.interfaces.eth1.ipv4.addresses = [
-          {
-            address = "192.168.1.2";
-            prefixLength = 24;
-          }
-        ];
+        imports = [ serverBase ];
         services.caddy.enable = true;
         services.caddy.virtualHosts."example.com" = {
           extraConfig = ''
@@ -54,16 +61,8 @@
             respond "Hello from example.com"
           '';
         };
-        services.subdomain-blackhole.enable = true;
-        networking.firewall.allowedTCPPorts = [ 443 ];
       };
-    nodes.attacker = {
-      networking.hosts."192.168.1.2" = [
-        "example.com"
-        "unknown.example.com"
-      ];
-      environment.etc."ssl/server.pem".source = ./test/cert.pem;
-    };
+    nodes.attacker = attacker;
     testScript = builtins.readFile ./test/caddy.py;
   };
 }
