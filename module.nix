@@ -54,13 +54,11 @@ in
         ''
           [Definition]
           failregex = ^.*handshake rejected.*client: <HOST>,.*$
-          ignoreregex =
         ''
       else
         ''
           [Definition]
           failregex = ^.*TLS handshake error from <HOST>:\d+:.*$
-          ignoreregex =
           datepattern = "ts":{EPOCH}
         '';
 

@@ -11,6 +11,9 @@ assert "Hello from example.com" in result, f"Expected greeting, got: {result}"
 # Make a request with unmatched SNI (TLS fails, but IP gets logged)
 attacker.fail("curl -sk https://unknown.example.com/")
 
+# Verify fail2ban filter matches the log (failregex and datepattern work)
+server.succeed("fail2ban-regex /var/log/caddy/subdomain-blackhole.log /etc/fail2ban/filter.d/subdomain-blackhole.conf")
+
 # Wait for fail2ban to ban the IP and verify exact output
 server.wait_until_succeeds("fail2ban-client status subdomain-blackhole | grep -q '192.168.1.1'", timeout=10)
 output = server.succeed("fail2ban-client status subdomain-blackhole")
