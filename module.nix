@@ -20,10 +20,10 @@ let
   # Caddy log path for TLS handshake errors (uses services.caddy.logDir)
   caddyLogPath = "${config.services.caddy.logDir}/subdomain-blackhole.log";
 
-  # Check for nginx virtualHosts with default = true (excluding our catch-all "_")
-  defaultNginxHosts = lib.filterAttrs (name: vhost: name != "_" && (vhost.default or false)) (
-    config.services.nginx.virtualHosts or { }
-  );
+  # Check for nginx virtualHosts with default = true (excluding our catch-all)
+  defaultNginxHosts = lib.filterAttrs (
+    name: vhost: name != "subdomain_blackhole" && (vhost.default or false)
+  ) (config.services.nginx.virtualHosts or { });
 
   # Check for Caddy catch-all virtualHosts (ports without domains)
   caddyCatchAllHosts = lib.filterAttrs (name: _: builtins.match "^:[0-9]+$" name != null) (
@@ -101,7 +101,7 @@ in
     # Example: if only "example.com" is configured, a request to "unknown.example.com"
     # would be served using example.com's certificate instead of being rejected.
     # rejectSSL uses ssl_reject_handshake to close the connection and log the attempt.
-    services.nginx.virtualHosts."_" = lib.mkIf (webserver == "nginx") {
+    services.nginx.virtualHosts.subdomain_blackhole = lib.mkIf (webserver == "nginx") {
       default = true;
       rejectSSL = true;
       extraConfig = ''
