@@ -36,12 +36,8 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
+  config = lib.mkIf (cfg.enable && webserver != null) {
     assertions = [
-      {
-        assertion = webserver != null;
-        message = "subdomain-blackhole: requires either nginx or caddy to be enabled";
-      }
       {
         assertion = webserver != "nginx" || otherDefaultNginxHosts == { };
         message = "subdomain-blackhole: cannot have other nginx virtualHosts with 'default = true'. Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames otherDefaultNginxHosts)}";
