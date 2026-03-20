@@ -112,8 +112,8 @@ in
 
     # Ensure caddy log file exists before fail2ban starts
     systemd.tmpfiles.rules = lib.mkIf (webserver == "caddy") [
-      "d ${builtins.dirOf caddyLogPath} 0755 caddy caddy -"
-      "f ${caddyLogPath} 0644 caddy caddy -"
+      "d ${builtins.dirOf caddyLogPath} 0755 ${config.services.caddy.user} ${config.services.caddy.group} -"
+      "f ${caddyLogPath} 0644 ${config.services.caddy.user} ${config.services.caddy.group} -"
     ];
 
     # Caddy named logger for TLS handshake errors - doesn't touch default logger
