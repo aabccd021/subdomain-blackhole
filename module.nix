@@ -36,8 +36,16 @@ in
     };
   };
 
-  config = lib.mkIf (cfg.enable && (config.services.nginx.enable || config.services.caddy.enable)) {
+  config = lib.mkIf cfg.enable {
     assertions = [
+      {
+        assertion = config.services.nginx.enable || config.services.caddy.enable;
+        message = "subdomain-blackhole: either nginx or caddy must be enabled";
+      }
+      {
+        assertion = !(config.services.nginx.enable && config.services.caddy.enable);
+        message = "subdomain-blackhole: cannot have both nginx and caddy enabled";
+      }
       {
         assertion = !config.services.nginx.enable || defaultNginxHosts == { };
         message = "subdomain-blackhole: cannot have nginx virtualHosts with 'default = true'. Conflicting hosts: ${lib.concatStringsSep ", " (lib.attrNames defaultNginxHosts)}";
