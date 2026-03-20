@@ -10,7 +10,10 @@
       {
         imports = [ self.nixosModules.default ];
         networking.interfaces.eth1.ipv4.addresses = [
-          { address = "192.168.1.2"; prefixLength = 24; }
+          {
+            address = "192.168.1.2";
+            prefixLength = 24;
+          }
         ];
         services.nginx.enable = true;
         services.nginx.virtualHosts."example.com" = {
@@ -23,7 +26,10 @@
         networking.firewall.allowedTCPPorts = [ 443 ];
       };
     nodes.attacker = {
-      networking.hosts."192.168.1.2" = [ "example.com" "unknown.example.com" ];
+      networking.hosts."192.168.1.2" = [
+        "example.com"
+        "unknown.example.com"
+      ];
       environment.etc."ssl/server.pem".source = ./test/cert.pem;
     };
     testScript = builtins.readFile ./test/nginx.py;
@@ -36,7 +42,10 @@
       {
         imports = [ self.nixosModules.default ];
         networking.interfaces.eth1.ipv4.addresses = [
-          { address = "192.168.1.2"; prefixLength = 24; }
+          {
+            address = "192.168.1.2";
+            prefixLength = 24;
+          }
         ];
         services.caddy.enable = true;
         services.caddy.virtualHosts."example.com" = {
@@ -49,7 +58,10 @@
         networking.firewall.allowedTCPPorts = [ 443 ];
       };
     nodes.attacker = {
-      networking.hosts."192.168.1.2" = [ "example.com" "unknown.example.com" ];
+      networking.hosts."192.168.1.2" = [
+        "example.com"
+        "unknown.example.com"
+      ];
       environment.etc."ssl/server.pem".source = ./test/cert.pem;
     };
     testScript = builtins.readFile ./test/caddy.py;

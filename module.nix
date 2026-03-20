@@ -8,8 +8,9 @@ let
   nginxEnabled = config.services.nginx.enable;
   caddyEnabled = config.services.caddy.enable;
   webserver = if nginxEnabled then "nginx" else "caddy";
+  filterName = "subdomain-blackhole";
 
-  # Check for other nginx virtualHosts with default = true
+  # Check for other nginx virtualHosts with default = true (excluding our own "_")
   otherDefaultNginxHosts = lib.filterAttrs (name: vhost: name != "_" && (vhost.default or false)) (
     config.services.nginx.virtualHosts or { }
   );
@@ -44,7 +45,7 @@ in
     ];
 
     # Fail2ban filter
-    environment.etc."fail2ban/filter.d/subdomain-blackhole.conf".text =
+    environment.etc."fail2ban/filter.d/${filterName}.conf".text =
       if webserver == "nginx" then
         ''
           [Definition]
@@ -66,7 +67,7 @@ in
       enable = true;
       jails.${cfg.jailName}.settings = {
         enabled = true;
-        filter = "subdomain-blackhole";
+        filter = filterName;
         backend = "systemd";
         maxretry = lib.mkDefault 1;
       };
@@ -95,6 +96,5 @@ in
         }
       ];
     };
-
   };
 }
