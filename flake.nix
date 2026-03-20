@@ -45,6 +45,15 @@
         formatting = treefmtEval.config.build.check self;
         test-nginx = tests.nginx;
         test-caddy = tests.caddy;
+        generate-cert = pkgs.writeShellApplication {
+          name = "generate-cert";
+          runtimeInputs = [ pkgs.openssl ];
+          text = ''
+            domain="$1"
+            outfile="$2"
+            openssl req -x509 -newkey rsa:2048 -keyout "''${outfile%.pem}.key.pem" -out "$outfile" -days 365 -nodes -subj "/CN=$domain"
+          '';
+        };
       };
 
     in
