@@ -18,7 +18,7 @@ expected = """Status for the jail: subdomain-blackhole
 |- Filter
 |  |- Currently failed:\t0
 |  |- Total failed:\t1
-|  `- Journal matches:\t_SYSTEMD_UNIT=nginx.service
+|  `- File list:\t/var/log/nginx/subdomain-blackhole.log
 `- Actions
    |- Currently banned:\t1
    |- Total banned:\t1

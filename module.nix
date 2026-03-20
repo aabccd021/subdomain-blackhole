@@ -53,9 +53,8 @@ in
       if webserver == "nginx" then
         ''
           [Definition]
-          failregex = ^.*nginx.*handshake rejected.*client: <HOST>,.*$
+          failregex = ^.*handshake rejected.*client: <HOST>,.*$
           ignoreregex =
-          journalmatch = _SYSTEMD_UNIT=nginx.service
         ''
       else if webserver == "caddy" then
         ''
@@ -71,16 +70,25 @@ in
     # Fail2ban jail
     services.fail2ban = {
       enable = true;
-      jails.${cfg.jailName}.settings = {
-        enabled = true;
-        filter = filterName;
-        backend = "systemd";
-        maxretry = lib.mkDefault 1;
-      };
+      jails.${cfg.jailName}.settings =
+        if webserver == "nginx" then
+          {
+            enabled = true;
+            filter = filterName;
+            backend = "auto";
+            logpath = "/var/log/nginx/subdomain-blackhole.log";
+            maxretry = lib.mkDefault 1;
+          }
+        else if webserver == "caddy" then
+          {
+            enabled = true;
+            filter = filterName;
+            backend = "systemd";
+            maxretry = lib.mkDefault 1;
+          }
+        else
+          throw "subdomain-blackhole: unsupported webserver";
     };
-
-    # Nginx log level to capture ssl_reject_handshake
-    services.nginx.logError = lib.mkIf (webserver == "nginx") "stderr info";
 
     # Nginx catch-all to reject unmatched SNI.
     # Without this, nginx uses the first matching certificate for unknown domains.
@@ -90,6 +98,9 @@ in
     services.nginx.virtualHosts."_" = lib.mkIf (webserver == "nginx") {
       default = true;
       rejectSSL = true;
+      extraConfig = ''
+        error_log /var/log/nginx/subdomain-blackhole.log info;
+      '';
     };
 
     # Caddy log level to capture TLS handshake errors
