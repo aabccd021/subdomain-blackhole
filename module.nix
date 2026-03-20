@@ -13,6 +13,7 @@ let
     else
       null;
   filterName = "subdomain-blackhole";
+  nginxHostName = "subdomain-blackhole";
 
   # Hardcoded in NixOS nginx module (services.nginx.stateDir was removed)
   nginxLogPath = "/var/log/nginx/subdomain-blackhole.log";
@@ -22,7 +23,7 @@ let
 
   # Check for nginx virtualHosts with default = true (excluding our catch-all)
   defaultNginxHosts = lib.filterAttrs (
-    name: vhost: name != "subdomain_blackhole" && (vhost.default or false)
+    name: vhost: name != nginxHostName && (vhost.default or false)
   ) (config.services.nginx.virtualHosts or { });
 
   # Check for Caddy catch-all virtualHosts (ports without domains)
@@ -101,7 +102,7 @@ in
     # Example: if only "example.com" is configured, a request to "unknown.example.com"
     # would be served using example.com's certificate instead of being rejected.
     # rejectSSL uses ssl_reject_handshake to close the connection and log the attempt.
-    services.nginx.virtualHosts.subdomain_blackhole = lib.mkIf (webserver == "nginx") {
+    services.nginx.virtualHosts.${nginxHostName} = lib.mkIf (webserver == "nginx") {
       default = true;
       rejectSSL = true;
       extraConfig = ''
