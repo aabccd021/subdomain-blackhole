@@ -115,11 +115,12 @@ in
       "f ${caddyLogPath} 0644 caddy caddy -"
     ];
 
-    # Caddy log format - write to file with minimum level needed for TLS errors
-    # TLS handshake errors are logged at DEBUG level in Caddy
-    services.caddy.logFormat = lib.mkIf (webserver == "caddy") ''
-      output file ${caddyLogPath}
-      level DEBUG
+    # Caddy named logger for TLS handshake errors - doesn't touch default logger
+    services.caddy.globalConfig = lib.mkIf (webserver == "caddy") ''
+      log subdomain-blackhole {
+        output file ${caddyLogPath}
+        level DEBUG
+      }
     '';
 
   };
