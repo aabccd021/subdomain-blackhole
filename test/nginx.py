@@ -24,3 +24,15 @@ expected = """Status for the jail: subdomain-blackhole
    |- Total banned:\t1
    `- Banned IP list:\t192.168.1.1"""
 assert output.strip() == expected, f"Expected:\n{expected}\n\nGot:\n{output}"
+
+# 1. Verify banned IP is actually blocked from accessing legitimate domain
+attacker.fail("curl -s --connect-timeout 5 --cacert /etc/ssl/server.pem https://example.com/")
+
+# 2. Verify banned IP can't make more probing attempts (blocked at firewall)
+# -k skips SSL verification so we test firewall block, not SSL rejection
+attacker.fail("curl -sk --connect-timeout 5 https://unknown.example.com/")
+
+# 3. Verify other IPs are unaffected - user can still access the server
+user.wait_for_unit("multi-user.target")
+result = user.succeed("curl -s --cacert /etc/ssl/server.pem https://example.com/")
+assert "Hello from example.com" in result, f"Expected greeting from user, got: {result}"
