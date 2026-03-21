@@ -40,6 +40,8 @@ let
       }
     ];
     services.subdomain-blackhole.enable = true;
+    # Override ignoreip for testing: only ignore localhost so we can test banning with 192.168.x IPs
+    services.fail2ban.jails.subdomain-blackhole.settings.ignoreip = "127.0.0.0/8 ::1";
     networking.firewall.allowedTCPPorts = [ 443 ];
   };
 in
