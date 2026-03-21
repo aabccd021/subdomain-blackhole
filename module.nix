@@ -79,6 +79,8 @@ in
           else
             throw "subdomain-blackhole: either nginx or caddy must be enabled";
         maxretry = lib.mkDefault 1;
+        bantime = "365d";
+        ignoreip = "127.0.0.0/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16";
       };
     };
 
