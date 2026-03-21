@@ -81,4 +81,44 @@ in
     nodes.user = user;
     testScript = builtins.readFile ./test/caddy.py;
   };
+
+  nginx-forceSSL = pkgs.testers.runNixOSTest {
+    name = "subdomain-blackhole-nginx-forceSSL";
+    nodes.server =
+      { ... }:
+      {
+        imports = [ serverBase ];
+        services.nginx.enable = true;
+        services.nginx.virtualHosts."example.com" = {
+          forceSSL = true;
+          sslCertificate = ./test/cert.pem;
+          sslCertificateKey = ./test/key.pem;
+          locations."/".return = "200 'Hello from example.com'";
+        };
+        networking.firewall.allowedTCPPorts = [ 80 ];
+      };
+    nodes.attacker = attacker;
+    nodes.user = user;
+    testScript = builtins.readFile ./test/nginx-forceSSL.py;
+  };
+
+  nginx-addSSL = pkgs.testers.runNixOSTest {
+    name = "subdomain-blackhole-nginx-addSSL";
+    nodes.server =
+      { ... }:
+      {
+        imports = [ serverBase ];
+        services.nginx.enable = true;
+        services.nginx.virtualHosts."example.com" = {
+          addSSL = true;
+          sslCertificate = ./test/cert.pem;
+          sslCertificateKey = ./test/key.pem;
+          locations."/".return = "200 'Hello from example.com'";
+        };
+        networking.firewall.allowedTCPPorts = [ 80 ];
+      };
+    nodes.attacker = attacker;
+    nodes.user = user;
+    testScript = builtins.readFile ./test/nginx-addSSL.py;
+  };
 }
